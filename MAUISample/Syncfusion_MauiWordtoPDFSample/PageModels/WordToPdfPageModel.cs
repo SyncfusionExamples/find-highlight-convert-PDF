@@ -134,22 +134,37 @@ namespace Syncfusion_MauiWordtoPDFSample.PageModels
             try
             {
                 var fileName = $"Document_{DateTime.Now:yyyyMMdd_HHmmss}.pdf";
-                var cancellationToken = new CancellationToken();
 
-#if WINDOWS
-                var savePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), fileName);
-#elif ANDROID || iOS || MACCATALYST
-                var savePath = Path.Combine(FileSystem.Current.AppDataDirectory, fileName);
-#else
-                var savePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), fileName);
-#endif
+                // Use the app's own data directory which is guaranteed to be writable
+                // on every platform (Windows, Android, iOS, MacCatalyst). Saving into
+                // the user's Documents folder from a MAUI desktop app can fail because
+                // the folder may be redirected or the process may lack permissions.
+                var saveDirectory = FileSystem.Current.AppDataDirectory;
+                Directory.CreateDirectory(saveDirectory);
+                var savePath = Path.Combine(saveDirectory, fileName);
 
                 _pdfStream.Position = 0;
-                using var fileStream = File.Create(savePath);
-                await _pdfStream.CopyToAsync(fileStream);
+                using (var fileStream = File.Create(savePath))
+                {
+                    await _pdfStream.CopyToAsync(fileStream);
+                }
 
                 StatusMessage = $"PDF saved to: {savePath}";
-                await Application.Current!.MainPage!.DisplayAlert("Saved", $"PDF saved successfully to:\n{savePath}", "OK");
+
+                // Try to open the saved file with the system's default PDF viewer.
+                // This is optional - if launching fails we still keep the saved file.
+                try
+                {
+                    await Launcher.Default.OpenAsync(new OpenFileRequest
+                    {
+                        Title = fileName,
+                        File = new ReadOnlyFile(savePath)
+                    });
+                }
+                catch
+                {
+                    // Ignore launcher errors; the file is still saved.
+                }
             }
             catch (Exception ex)
             {
