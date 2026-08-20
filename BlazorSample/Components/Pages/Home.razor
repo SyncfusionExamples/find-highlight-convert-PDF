@@ -6,6 +6,8 @@
 @using Syncfusion.DocIO
 @using Syncfusion.DocIO.DLS
 @using Syncfusion.DocIORenderer
+@using Syncfusion.Blazor
+@using Syncfusion.Blazor.SfPdfViewer
 @inject IJSRuntime JS
 @rendermode InteractiveServer
 
@@ -143,17 +145,30 @@
                     <button type="button" class="btn btn-secondary" @onclick="HandleClear">
                         <i class="bi bi-arrow-counterclockwise"></i> Clear
                     </button>
-                    <button type="submit" class="btn btn-primary" disabled="@isProcessing">
-                        @if (isProcessing)
-                        {
-                            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                            <span>Processing...</span>
-                        }
-                        else
-                        {
-                            <span><i class="bi bi-file-earmark-pdf"></i> Convert to PDF</span>
-                        }
-                    </button>
+
+                    @if (htmlConvertedPdf != null && htmlConvertedPdf.Length > 0)
+                    {
+                        <button type="button" class="btn btn-info text-white" @onclick="ShowHtmlPdfViewer">
+                            <i class="bi bi-eye"></i> View PDF
+                        </button>
+                        <button type="button" class="btn btn-success" @onclick="DownloadHtmlPdfAsync">
+                            <i class="bi bi-download"></i> Download PDF
+                        </button>
+                    }
+                    else
+                    {
+                        <button type="submit" class="btn btn-primary" disabled="@isProcessing">
+                            @if (isProcessing)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                <span>Processing...</span>
+                            }
+                            else
+                            {
+                                <span><i class="bi bi-file-earmark-pdf"></i> Convert to PDF</span>
+                            }
+                        </button>
+                    }
                 </div>
 
                 <!-- Status Messages -->
@@ -175,6 +190,22 @@
                     </div>
                 }
             </EditForm>
+
+                <!-- HTML PDF Viewer -->
+                @if (showHtmlViewer && htmlConvertedPdf != null && htmlConvertedPdf.Length > 0)
+                {
+                    <div class="mt-4">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h5 class="mb-0"><i class="bi bi-file-pdf"></i> PDF Preview</h5>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="CloseHtmlViewer">
+                                <i class="bi bi-x-lg"></i> Close Viewer
+                            </button>
+                        </div>
+                        <SfPdfViewer2 @ref="htmlPdfViewer" Height="700px" Width="100%">
+                            <PdfViewerEvents Created="OnHtmlViewerCreated"/>    
+                        </SfPdfViewer2>
+                    </div>
+                }
                 </div>
 
                 <!-- Word to PDF Tab -->
@@ -209,17 +240,30 @@
                             <button type="button" class="btn btn-secondary" @onclick="HandleWordClear">
                                 <i class="bi bi-arrow-counterclockwise"></i> Clear
                             </button>
-                            <button type="submit" class="btn btn-primary" disabled="@isWordProcessing">
-                                @if (isWordProcessing)
-                                {
-                                    <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                                    <span>Processing...</span>
-                                }
-                                else
-                                {
-                                    <span><i class="bi bi-file-earmark-pdf"></i> Convert to PDF</span>
-                                }
-                            </button>
+
+                            @if (wordConvertedPdf != null && wordConvertedPdf.Length > 0)
+                            {
+                                <button type="button" class="btn btn-info text-white" @onclick="ShowWordPdfViewer">
+                                    <i class="bi bi-eye"></i> View PDF
+                                </button>
+                                <button type="button" class="btn btn-success" @onclick="DownloadWordPdfAsync">
+                                    <i class="bi bi-download"></i> Download PDF
+                                </button>
+                            }
+                            else
+                            {
+                                <button type="submit" class="btn btn-primary" disabled="@isWordProcessing">
+                                    @if (isWordProcessing)
+                                    {
+                                        <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                        <span>Processing...</span>
+                                    }
+                                    else
+                                    {
+                                        <span><i class="bi bi-file-earmark-pdf"></i> Convert to PDF</span>
+                                    }
+                                </button>
+                            }
                         </div>
 
                         <!-- Status Messages -->
@@ -241,6 +285,22 @@
                             </div>
                         }
                     </EditForm>
+
+                    <!-- Word PDF Viewer -->
+                    @if (showWordViewer && wordConvertedPdf != null && wordConvertedPdf.Length > 0)
+                    {
+                        <div class="mt-4">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <h5 class="mb-0"><i class="bi bi-file-pdf"></i> PDF Preview</h5>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="CloseWordViewer">
+                                    <i class="bi bi-x-lg"></i> Close Viewer
+                                </button>
+                            </div>
+                            <SfPdfViewer2 @ref="wordPdfViewer" Height="700px" Width="100%" >
+                                <PdfViewerEvents Created="OnWordViewerCreated"/>    
+                            </SfPdfViewer2>
+                        </div>
+                    }
                 </div>
             </div>
         </div>
@@ -255,6 +315,11 @@
     private string? errorMessage;
     private bool isProcessing;
 
+    // HTML converted PDF state
+    private byte[]? htmlConvertedPdf;
+    private bool showHtmlViewer;
+    private SfPdfViewer2? htmlPdfViewer;
+
     // Word to PDF variables
     private EditContext? wordEditContext;
     private WordConversionRequest wordConversionRequest = new();
@@ -262,6 +327,11 @@
     private string? wordStatusMessage;
     private string? wordErrorMessage;
     private bool isWordProcessing;
+
+    // Word converted PDF state
+    private byte[]? wordConvertedPdf;
+    private bool showWordViewer;
+    private SfPdfViewer2? wordPdfViewer;
 
     protected override void OnInitialized()
     {
@@ -340,13 +410,12 @@
 
             if (result.Success && result.PdfBytes != null && result.PdfBytes.Length > 0)
             {
+                htmlConvertedPdf = result.PdfBytes;
                 statusMessage = result.Message;
-
-                // Download the PDF file
-                await DownloadPdfAsync(result.PdfBytes);
             }
             else
             {
+                htmlConvertedPdf = null;
                 errorMessage = result.Message ?? "Conversion failed without an error message.";
             }
         }
@@ -372,6 +441,11 @@
         errorMessage = null;
         isProcessing = false;
 
+        // Reset converted PDF and viewer state
+        htmlConvertedPdf = null;
+        showHtmlViewer = false;
+        htmlPdfViewer = null;
+
         // Recreate edit context
         editContext = new EditContext(conversionRequest);
     }
@@ -385,6 +459,50 @@
         string fileName = $"converted_{DateTime.Now:yyyyMMdd_HHmmss}.pdf";
 
         await JS.SaveAs(fileName, pdfBytes);       
+    }
+
+    /// <summary>
+    /// Show the SfPdfViewer component.
+    /// </summary>
+    private void ShowHtmlPdfViewer()
+    {
+        if (htmlConvertedPdf == null || htmlConvertedPdf.Length == 0)
+        {
+            errorMessage = "No converted PDF available to view.";
+            return;
+        }
+
+        showHtmlViewer = true;
+    }
+
+    /// <summary>
+    /// Load the converted HTML PDF.
+    /// </summary>
+    private async Task OnHtmlViewerCreated()
+    {
+        if (htmlPdfViewer != null && showHtmlViewer)
+        {
+            await htmlPdfViewer.LoadAsync(htmlConvertedPdf);
+        }
+    }
+
+    /// <summary>
+    /// Close the HTML PDF viewer.
+    /// </summary>
+    private void CloseHtmlViewer()
+    {
+        showHtmlViewer = false;
+    }
+
+    /// <summary>
+    /// Download the HTML-converted PDF.
+    /// </summary>
+    private async Task DownloadHtmlPdfAsync()
+    {
+        if (htmlConvertedPdf != null && htmlConvertedPdf.Length > 0)
+        {
+            await DownloadPdfAsync(htmlConvertedPdf);
+        }
     }
 
     /// <summary>
@@ -556,13 +674,12 @@
 
             if (result.Success && result.PdfBytes != null && result.PdfBytes.Length > 0)
             {
+                wordConvertedPdf = result.PdfBytes;
                 wordStatusMessage = result.Message;
-
-                // Download the PDF file
-                await DownloadPdfAsync(result.PdfBytes);
             }
             else
             {
+                wordConvertedPdf = null;
                 wordErrorMessage = result.Message ?? "Conversion failed without an error message.";
             }
         }
@@ -587,6 +704,11 @@
         wordStatusMessage = null;
         wordErrorMessage = null;
         isWordProcessing = false;
+
+        // Reset converted PDF and viewer state
+        wordConvertedPdf = null;
+        showWordViewer = false;
+        wordPdfViewer = null;
 
         // Recreate edit context
         wordEditContext = new EditContext(wordConversionRequest);
@@ -682,6 +804,49 @@
                     ex);
             }
         }
+
+    /// <summary>
+    /// Show the SfPdfViewer Component.
+    /// </summary>
+    private void ShowWordPdfViewer()
+    {
+        if (wordConvertedPdf == null || wordConvertedPdf.Length == 0)
+        {
+            wordErrorMessage = "No converted PDF available to view.";
+            return;
+        }
+        showWordViewer = true;
+    }
+
+    /// <summary>
+    /// Load the converted Word PDF.
+    /// </summary>
+    private async Task OnWordViewerCreated()
+    {
+        if (wordPdfViewer != null && showWordViewer)
+        {
+            await wordPdfViewer.LoadAsync(wordConvertedPdf);
+        }
+    }
+
+    /// <summary>
+    /// Close the Word PDF viewer.
+    /// </summary>
+    private void CloseWordViewer()
+    {
+        showWordViewer = false;
+    }
+
+    /// <summary>
+    /// Download the Word-converted PDF.
+    /// </summary>
+    private async Task DownloadWordPdfAsync()
+    {
+        if (wordConvertedPdf != null && wordConvertedPdf.Length > 0)
+        {
+            await DownloadPdfAsync(wordConvertedPdf);
+        }
+    }
         /// <summary>
         /// Compresses a PDF stream produced from the Word-to-PDF conversion.
         /// WordConversionRequest does not expose compression options today, so

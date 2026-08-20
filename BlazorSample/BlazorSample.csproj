@@ -11,6 +11,8 @@
     <PackageReference Include="Syncfusion.HtmlToPdfConverter.Net.Windows" Version="34.2.2" />
 	  <PackageReference Include="Syncfusion.DocIO.Net.Core" Version="34.2.2" />
 	  <PackageReference Include="Syncfusion.DocIORenderer.Net.Core" Version="34.2.2" />
+    <PackageReference Include="Syncfusion.Blazor.SfPdfViewer" Version="34.2.4" />
+    <PackageReference Include="Syncfusion.Blazor.Themes" Version="34.2.4" />
   </ItemGroup>
 
 </Project>

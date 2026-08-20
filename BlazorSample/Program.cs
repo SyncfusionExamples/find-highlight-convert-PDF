@@ -1,10 +1,17 @@
 using BlazorSample.Components;
+using Syncfusion.Blazor;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
+
+// Configure SignalR (with increased message size) and enable memory caching
+builder.Services.AddSignalR(o => { o.MaximumReceiveMessageSize = 102400000; });
+builder.Services.AddMemoryCache();
+// Register Syncfusion Blazor service
+builder.Services.AddSyncfusionBlazor();
 
 var app = builder.Build();
 
