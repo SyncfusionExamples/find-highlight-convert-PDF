@@ -56,15 +56,67 @@
                        ClearButtonVisibility="WhileEditing" />
             </VerticalStackLayout>
 
-            <VerticalStackLayout Spacing="4">
-                <Label Text="Compression option"
-                       FontSize="{StaticResource PageFontBody}"
-                       FontAttributes="Bold" />
-                <Picker Title="Select compression level"
-                        FontSize="{StaticResource PageFontBody}"
-                        ItemsSource="{Binding CompressionOptions}"
-                        SelectedItem="{Binding CompressionLevel}" />
-            </VerticalStackLayout>
+            <Border StrokeShape="RoundRectangle 10"
+                    Padding="10"
+                    BackgroundColor="{AppThemeBinding Light={StaticResource LightSecondaryBackground}, Dark={StaticResource DarkSecondaryBackground}}">
+                <VerticalStackLayout Spacing="6">
+                    <Label Text="Compression options"
+                           FontSize="{StaticResource PageFontBody}"
+                           FontAttributes="Bold" />
+
+                    <HorizontalStackLayout Spacing="8">
+                        <CheckBox IsChecked="{Binding CompressImage}"
+                                  VerticalOptions="Center" />
+                        <Label Text="Compress image"
+                               FontSize="{StaticResource PageFontBody}"
+                               VerticalOptions="Center"
+                               VerticalTextAlignment="Center" />
+                    </HorizontalStackLayout>
+
+                    <Grid ColumnDefinitions="Auto,Auto"
+                          ColumnSpacing="6"
+                          IsVisible="{Binding CompressImage}"
+                          HorizontalOptions="Start">
+                        <Label Grid.Column="0"
+                               Text="Image quality:"
+                               FontSize="{StaticResource PageFontBody}"
+                               VerticalOptions="Center" />
+                        <Picker Grid.Column="1"
+                                Title="Quality"
+                                FontSize="{StaticResource PageFontBody}"
+                                ItemsSource="{Binding ImageQualityOptions}"
+                                SelectedItem="{Binding ImageQuality}"
+                                WidthRequest="100" />
+                    </Grid>
+
+                    <HorizontalStackLayout Spacing="8">
+                        <CheckBox IsChecked="{Binding OptimizePageContents}"
+                                  VerticalOptions="Center" />
+                        <Label Text="Optimize page contents"
+                               FontSize="{StaticResource PageFontBody}"
+                               VerticalOptions="Center"
+                               VerticalTextAlignment="Center" />
+                    </HorizontalStackLayout>
+
+                    <HorizontalStackLayout Spacing="8">
+                        <CheckBox IsChecked="{Binding OptimizeFont}"
+                                  VerticalOptions="Center" />
+                        <Label Text="Optimize font"
+                               FontSize="{StaticResource PageFontBody}"
+                               VerticalOptions="Center"
+                               VerticalTextAlignment="Center" />
+                    </HorizontalStackLayout>
+
+                    <HorizontalStackLayout Spacing="8">
+                        <CheckBox IsChecked="{Binding RemoveMetadata}"
+                                  VerticalOptions="Center" />
+                        <Label Text="Remove metadata information"
+                               FontSize="{StaticResource PageFontBody}"
+                               VerticalOptions="Center"
+                               VerticalTextAlignment="Center" />
+                    </HorizontalStackLayout>
+                </VerticalStackLayout>
+            </Border>
 
             <Button Text="Convert to PDF"
                     Command="{Binding ConvertCommand}"

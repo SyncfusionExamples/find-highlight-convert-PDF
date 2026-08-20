@@ -230,9 +230,82 @@
                         <!-- Search Text Section -->
                         <div class="mb-4">
                             <label for="wordSearchText" class="form-label fw-bold">Search Text (optional)</label>
-                            <InputText id="wordSearchText" @bind-Value="wordConversionRequest.SearchText" 
+                            <InputText id="wordSearchText" @bind-Value="wordConversionRequest.SearchText"
                                 class="form-control" placeholder="Enter text to search and highlight..." />
                             <small class="form-text text-muted d-block mt-1">Leave empty if no highlighting is needed</small>
+                        </div>
+
+                        <!-- Compression Options Section -->
+                        <div class="mb-4">
+                            <div class="card border-light">
+                                <div class="card-header bg-light border-bottom">
+                                    <h5 class="mb-0">
+                                        <i class="bi bi-sliders"></i> Compression Options
+                                    </h5>
+                                </div>
+                                <div class="card-body">
+                                    <!-- Compress Image -->
+                                    <div class="row mb-3">
+                                        <div class="col-md-6">
+                                            <div class="form-check">
+                                                <InputCheckbox id="wordCompressImage" @bind-Value="wordConversionRequest.CompressImage"
+                                                    class="form-check-input" />
+                                                <label class="form-check-label" for="wordCompressImage">
+                                                    Compress Image
+                                                </label>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            @if (wordConversionRequest.CompressImage)
+                                            {
+                                                <div class="input-group input-group-sm">
+                                                    <label class="input-group-text" for="wordImageQuality">Quality:</label>
+                                                    <InputSelect id="wordImageQuality" @bind-Value="wordConversionRequest.ImageQuality"
+                                                        class="form-select form-select-sm">
+                                                        @for (int i = 10; i <= 100; i += 10)
+                                                        {
+                                                            <option value="@i">@i%</option>
+                                                        }
+                                                    </InputSelect>
+                                                </div>
+                                            }
+                                        </div>
+                                    </div>
+
+                                    <!-- Optimize Page Contents -->
+                                    <div class="mb-3">
+                                        <div class="form-check">
+                                            <InputCheckbox id="wordOptimizePageContents" @bind-Value="wordConversionRequest.OptimizePageContents"
+                                                class="form-check-input" />
+                                            <label class="form-check-label" for="wordOptimizePageContents">
+                                                Optimize Page Contents
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    <!-- Optimize Font -->
+                                    <div class="mb-3">
+                                        <div class="form-check">
+                                            <InputCheckbox id="wordOptimizeFont" @bind-Value="wordConversionRequest.OptimizeFont"
+                                                class="form-check-input" />
+                                            <label class="form-check-label" for="wordOptimizeFont">
+                                                Optimize Font
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    <!-- Remove Metadata Information -->
+                                    <div class="mb-3">
+                                        <div class="form-check">
+                                            <InputCheckbox id="wordRemoveMetadata" @bind-Value="wordConversionRequest.RemoveMetadata"
+                                                class="form-check-input" />
+                                            <label class="form-check-label" for="wordRemoveMetadata">
+                                                Remove Metadata Information
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Action Buttons -->
@@ -747,12 +820,15 @@
                 // Step 3: Convert Word to PDF
                 using var renderer = new DocIORenderer();
                 using var pdfDocument = renderer.ConvertToPDF(wordDoc);
-                using MemoryStream ms = new MemoryStream();
-                pdfDocument.Save(ms);
-                ms.Position = 0;
 
-                // Step 4: Compress the resulting PDF
-                MemoryStream compressedPdfStream = CompressPdf(ms, conversionRequest);
+                // Save the freshly-converted PDF into a memory stream so it can be
+                // reloaded as a PdfLoadedDocument (the type that supports Compress()).
+                using var intermediateStream = new MemoryStream();
+                pdfDocument.Save(intermediateStream);
+                intermediateStream.Position = 0;
+
+                // Step 4: Compress the resulting PDF using the user's options
+                MemoryStream compressedPdfStream = CompressPdf(intermediateStream, conversionRequest);
 
                 return new ConversionResult
                 {
@@ -849,31 +925,34 @@
     }
         /// <summary>
         /// Compresses a PDF stream produced from the Word-to-PDF conversion.
-        /// WordConversionRequest does not expose compression options today, so
-        /// default compression settings are applied. If you need user-tunable
-        /// compression for the Word path, add the same option properties used by
-        /// <see cref="ConversionRequest"/> onto <see cref="WordConversionRequest"/>.
+        /// Applies the same compression options the user selects in the
+        /// Word-to-PDF tab (compress image + image quality, optimize page
+        /// contents, optimize font, remove metadata) — mirroring the logic
+        /// used by the HTML-to-PDF path.
         /// </summary>
         private MemoryStream CompressPdf(Stream stream, WordConversionRequest conversionRequest)
         {
-            PdfLoadedDocument ldoc = new PdfLoadedDocument(stream);
+            // Reload the freshly-converted PDF so we can call Compress(), which
+            // is only available on PdfLoadedDocument.
+            using var loadedDocument = new PdfLoadedDocument(stream);
 
-            PdfCompressionOptions options = new PdfCompressionOptions
+            var options = new PdfCompressionOptions
             {
-                // Sensible defaults for Word-derived PDFs; adjust to taste.
-                CompressImages = true,
-                ImageQuality = 75,
-                OptimizePageContents = true,
-                OptimizeFont = true,
-                RemoveMetadata = false
+                CompressImages = conversionRequest.CompressImage,
+                ImageQuality = conversionRequest.CompressImage ? conversionRequest.ImageQuality : 100,
+                OptimizePageContents = conversionRequest.OptimizePageContents,
+                OptimizeFont = conversionRequest.OptimizeFont,
+                RemoveMetadata = conversionRequest.RemoveMetadata
             };
 
-            ldoc.Compress(options);
-            MemoryStream ms = new MemoryStream();
-            ldoc.Save(ms);
-            ldoc.Close(true);
-            ms.Position = 0;
-            return ms;
+            loadedDocument.Compress(options);
+
+            // Save the compressed PDF into a fresh memory stream and return it.
+            var outputStream = new MemoryStream();
+            loadedDocument.Save(outputStream);
+            loadedDocument.Close(true);
+            outputStream.Position = 0;
+            return outputStream;
         }
 
 
@@ -898,6 +977,11 @@
     {
         public byte[]? WordFileContent { get; set; }
         public string? SearchText { get; set; }
+        public bool CompressImage { get; set; }
+        public int ImageQuality { get; set; } = 50;
+        public bool OptimizePageContents { get; set; }
+        public bool OptimizeFont { get; set; }
+        public bool RemoveMetadata { get; set; }
     }
 
     /// <summary>

@@ -20,7 +20,19 @@ namespace Syncfusion_MauiWordtoPDFSample.PageModels
         private string? textToFind;
 
         [ObservableProperty]
-        private string compressionLevel = "Normal";
+        private bool compressImage;
+
+        [ObservableProperty]
+        private int imageQuality = 50;
+
+        [ObservableProperty]
+        private bool optimizePageContents;
+
+        [ObservableProperty]
+        private bool optimizeFont;
+
+        [ObservableProperty]
+        private bool removeMetadata;
 
         [ObservableProperty]
         private bool isBusy;
@@ -33,14 +45,7 @@ namespace Syncfusion_MauiWordtoPDFSample.PageModels
 
         private MemoryStream? _pdfStream;
 
-        public IReadOnlyList<string> CompressionOptions { get; } = new[]
-        {
-            "None",
-            "Low",
-            "Normal",
-            "High",
-            "Maximum"
-        };
+        public IReadOnlyList<int> ImageQualityOptions { get; } = Enumerable.Range(1, 10).Select(i => i * 10).ToList();
 
         [RelayCommand]
         private async Task BrowseAsync()
@@ -90,10 +95,16 @@ namespace Syncfusion_MauiWordtoPDFSample.PageModels
 
                 var inputPath = SelectedFilePath;
                 var findText = TextToFind ?? string.Empty;
-                var compression = CompressionLevel;
+                var compressImage = CompressImage;
+                var imageQuality = ImageQuality;
+                var optimizePageContents = OptimizePageContents;
+                var optimizeFont = OptimizeFont;
+                var removeMetadata = RemoveMetadata;
 
                 // Run on a background thread so UI stays responsive
-                _pdfStream = await Task.Run(() => ConvertToMemoryStream(inputPath, findText, compression));
+                _pdfStream = await Task.Run(() => ConvertToMemoryStream(
+                    inputPath, findText, compressImage, imageQuality,
+                    optimizePageContents, optimizeFont, removeMetadata));
 
                 IsConverted = true;
                 StatusMessage = "PDF created successfully. Choose an option below.";
@@ -247,12 +258,23 @@ namespace Syncfusion_MauiWordtoPDFSample.PageModels
             SelectedFilePath = null;
             SelectedFileName = null;
             TextToFind = null;
-            CompressionLevel = "Normal";
+            CompressImage = false;
+            ImageQuality = 50;
+            OptimizePageContents = false;
+            OptimizeFont = false;
+            RemoveMetadata = false;
             IsConverted = false;
             StatusMessage = null;
         }
 
-        private static string ConvertAndCompress(string inputPath, string findText, string compressionLevel)
+        private static string ConvertAndCompress(
+            string inputPath,
+            string findText,
+            bool compressImage,
+            int imageQuality,
+            bool optimizePageContents,
+            bool optimizeFont,
+            bool removeMetadata)
         {
             // 1. Load the document. Pick the right FormatType based on the extension
             //    so that .doc, .docx and .rtf are all supported.
@@ -287,23 +309,15 @@ namespace Syncfusion_MauiWordtoPDFSample.PageModels
             intermediateStream.Position = 0;
 
             using var loaded = new PdfLoadedDocument(intermediateStream);
-            if (!string.Equals(compressionLevel, "None", StringComparison.OrdinalIgnoreCase))
+            var options = new PdfCompressionOptions
             {
-                var options = new PdfCompressionOptions
-                {
-                    ImageQuality = compressionLevel switch
-                    {
-                        "Low" => 90,
-                        "High" => 50,
-                        "Maximum" => 30,
-                        _ => 70 // Normal
-                    },
-                    OptimizeFont = true,
-                    OptimizePageContents = true,
-                    RemoveMetadata = false
-                };
-                loaded.Compress(options);
-            }
+                CompressImages = compressImage,
+                ImageQuality = compressImage ? imageQuality : 100,
+                OptimizePageContents = optimizePageContents,
+                OptimizeFont = optimizeFont,
+                RemoveMetadata = removeMetadata
+            };
+            loaded.Compress(options);
 
             // 5. Save the final PDF next to the input file
             using var outputStream = File.Create(outputPath);
@@ -312,7 +326,14 @@ namespace Syncfusion_MauiWordtoPDFSample.PageModels
             return outputPath;
         }
 
-        private static MemoryStream ConvertToMemoryStream(string inputPath, string findText, string compressionLevel)
+        private static MemoryStream ConvertToMemoryStream(
+            string inputPath,
+            string findText,
+            bool compressImage,
+            int imageQuality,
+            bool optimizePageContents,
+            bool optimizeFont,
+            bool removeMetadata)
         {
             // 1. Load the document
             using var document = LoadDocument(inputPath);
@@ -342,23 +363,15 @@ namespace Syncfusion_MauiWordtoPDFSample.PageModels
             intermediateStream.Position = 0;
 
             using var loaded = new PdfLoadedDocument(intermediateStream);
-            if (!string.Equals(compressionLevel, "None", StringComparison.OrdinalIgnoreCase))
+            var options = new PdfCompressionOptions
             {
-                var options = new PdfCompressionOptions
-                {
-                    ImageQuality = compressionLevel switch
-                    {
-                        "Low" => 90,
-                        "High" => 50,
-                        "Maximum" => 30,
-                        _ => 70 // Normal
-                    },
-                    OptimizeFont = true,
-                    OptimizePageContents = true,
-                    RemoveMetadata = false
-                };
-                loaded.Compress(options);
-            }
+                CompressImages = compressImage,
+                ImageQuality = compressImage ? imageQuality : 100,
+                OptimizePageContents = optimizePageContents,
+                OptimizeFont = optimizeFont,
+                RemoveMetadata = removeMetadata
+            };
+            loaded.Compress(options);
 
             // 5. Save to memory stream
             var outputStream = new MemoryStream();
