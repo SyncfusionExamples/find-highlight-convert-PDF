@@ -1,0 +1,912 @@
+﻿@page "/"
+@using System.Text.RegularExpressions
+@using Syncfusion.HtmlConverter
+@using Syncfusion.Pdf
+@using Syncfusion.Pdf.Parsing
+@using Syncfusion.DocIO
+@using Syncfusion.DocIO.DLS
+@using Syncfusion.DocIORenderer
+@using Syncfusion.Blazor
+@using Syncfusion.Blazor.SfPdfViewer
+@inject IJSRuntime JS
+@rendermode InteractiveServer
+
+<PageTitle>File to PDF Conversion</PageTitle>
+
+<div class="container mt-5">
+    <div class="card shadow-lg">
+        <div class="card-header bg-primary text-white">
+            <h2 class="mb-0">
+                <i class="bi bi-file-pdf"></i> PDF Conversion
+            </h2>
+        </div>
+        <div class="card-body">
+            <!-- Tabs Navigation -->
+            <ul class="nav nav-tabs mb-4" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="htmlToPdfTab" @onclick="@(async () => await SwitchTab("htmlToPdfTab"))" 
+                        type="button" role="tab" aria-controls="htmlToPdfContent" aria-selected="true">
+                        <i class="bi bi-file-code"></i> HTML to PDF
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="wordToPdfTab" @onclick="@(async () => await SwitchTab("wordToPdfTab"))" 
+                        type="button" role="tab" aria-controls="wordToPdfContent" aria-selected="false">
+                        <i class="bi bi-file-word"></i> Word to PDF
+                    </button>
+                </li>
+            </ul>
+
+            <!-- Tab Content -->
+            <div class="tab-content">
+                <!-- HTML to PDF Tab -->
+                <div class="tab-pane fade show active" id="htmlToPdfContent" role="tabpanel" aria-labelledby="htmlToPdfTab">
+                    <EditForm Model="conversionRequest" OnValidSubmit="HandleConversionAsync" class="needs-validation">
+
+                <DataAnnotationsValidator />
+
+                <!-- File Upload Section -->
+                <div class="mb-4">
+                    <label for="htmlFile" class="form-label fw-bold">Upload HTML File</label>
+                    <InputFile id="htmlFile" class="form-control" accept=".html,.htm" 
+                        OnChange="HandleFileUploadAsync" />
+                    @if (!string.IsNullOrEmpty(fileName))
+                    {
+                        <small class="text-success d-block mt-2">
+                            <i class="bi bi-check-circle"></i> Selected: @fileName
+                        </small>
+                    }
+                    <small class="form-text text-muted d-block mt-1">Supported formats: .html, .htm</small>
+                </div>
+
+                <!-- Search Text Section -->
+                <div class="mb-4">
+                    <label for="searchText" class="form-label fw-bold">Search Text (optional)</label>
+                    <InputText id="searchText" @bind-Value="conversionRequest.SearchText" 
+                        class="form-control" placeholder="Enter text to search and highlight..." />
+                    <small class="form-text text-muted d-block mt-1">Leave empty if no highlighting is needed</small>
+                </div>
+
+                <!-- Compression Options Section -->
+                <div class="mb-4">
+                    <div class="card border-light">
+                        <div class="card-header bg-light border-bottom">
+                            <h5 class="mb-0">
+                                <i class="bi bi-sliders"></i> Compression Options
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <!-- Compress Image -->
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <div class="form-check">
+                                        <InputCheckbox id="compressImage" @bind-Value="conversionRequest.CompressImage" 
+                                            class="form-check-input" />
+                                        <label class="form-check-label" for="compressImage">
+                                            Compress Image
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    @if (conversionRequest.CompressImage)
+                                    {
+                                        <div class="input-group input-group-sm">
+                                            <label class="input-group-text" for="imageQuality">Quality:</label>
+                                            <InputSelect id="imageQuality" @bind-Value="conversionRequest.ImageQuality" 
+                                                class="form-select form-select-sm">
+                                                @for (int i = 10; i <= 100; i += 10)
+                                                {
+                                                    <option value="@i">@i%</option>
+                                                }
+                                            </InputSelect>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+
+                            <!-- Optimize Page Contents -->
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    <InputCheckbox id="optimizePageContents" @bind-Value="conversionRequest.OptimizePageContents" 
+                                        class="form-check-input" />
+                                    <label class="form-check-label" for="optimizePageContents">
+                                        Optimize Page Contents
+                                    </label>
+                                </div>
+                            </div>
+
+                            <!-- Optimize Font -->
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    <InputCheckbox id="optimizeFont" @bind-Value="conversionRequest.OptimizeFont" 
+                                        class="form-check-input" />
+                                    <label class="form-check-label" for="optimizeFont">
+                                        Optimize Font
+                                    </label>
+                                </div>
+                            </div>
+
+                            <!-- Remove Metadata Information -->
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    <InputCheckbox id="removeMetadata" @bind-Value="conversionRequest.RemoveMetadata" 
+                                        class="form-check-input" />
+                                    <label class="form-check-label" for="removeMetadata">
+                                        Remove Metadata Information
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                    <button type="button" class="btn btn-secondary" @onclick="HandleClear">
+                        <i class="bi bi-arrow-counterclockwise"></i> Clear
+                    </button>
+
+                    @if (htmlConvertedPdf != null && htmlConvertedPdf.Length > 0)
+                    {
+                        <button type="button" class="btn btn-info text-white" @onclick="ShowHtmlPdfViewer">
+                            <i class="bi bi-eye"></i> View PDF
+                        </button>
+                        <button type="button" class="btn btn-success" @onclick="DownloadHtmlPdfAsync">
+                            <i class="bi bi-download"></i> Download PDF
+                        </button>
+                    }
+                    else
+                    {
+                        <button type="submit" class="btn btn-primary" disabled="@isProcessing">
+                            @if (isProcessing)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                <span>Processing...</span>
+                            }
+                            else
+                            {
+                                <span><i class="bi bi-file-earmark-pdf"></i> Convert to PDF</span>
+                            }
+                        </button>
+                    }
+                </div>
+
+                <!-- Status Messages -->
+                @if (!string.IsNullOrEmpty(statusMessage))
+                {
+                    <div class="alert alert-info alert-dismissible fade show mt-4" role="alert">
+                        <i class="bi bi-info-circle"></i>
+                        @statusMessage
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                }
+
+                @if (!string.IsNullOrEmpty(errorMessage))
+                {
+                    <div class="alert alert-danger alert-dismissible fade show mt-4" role="alert">
+                        <i class="bi bi-exclamation-circle"></i>
+                        @errorMessage
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                }
+            </EditForm>
+
+                <!-- HTML PDF Viewer -->
+                @if (showHtmlViewer && htmlConvertedPdf != null && htmlConvertedPdf.Length > 0)
+                {
+                    <div class="mt-4">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h5 class="mb-0"><i class="bi bi-file-pdf"></i> PDF Preview</h5>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="CloseHtmlViewer">
+                                <i class="bi bi-x-lg"></i> Close Viewer
+                            </button>
+                        </div>
+                        <SfPdfViewer2 @ref="htmlPdfViewer" Height="700px" Width="100%">
+                            <PdfViewerEvents Created="OnHtmlViewerCreated"/>    
+                        </SfPdfViewer2>
+                    </div>
+                }
+                </div>
+
+                <!-- Word to PDF Tab -->
+                <div class="tab-pane fade" id="wordToPdfContent" role="tabpanel" aria-labelledby="wordToPdfTab">
+                    <EditForm Model="wordConversionRequest" OnValidSubmit="HandleWordConversionAsync" class="needs-validation">
+                        <DataAnnotationsValidator />
+
+                        <!-- File Upload Section -->
+                        <div class="mb-4">
+                            <label for="wordFile" class="form-label fw-bold">Upload Word File</label>
+                            <InputFile id="wordFile" class="form-control" accept=".doc,.docx" 
+                                OnChange="HandleWordFileUploadAsync" />
+                            @if (!string.IsNullOrEmpty(wordFileName))
+                            {
+                                <small class="text-success d-block mt-2">
+                                    <i class="bi bi-check-circle"></i> Selected: @wordFileName
+                                </small>
+                            }
+                            <small class="form-text text-muted d-block mt-1">Supported formats: .doc, .docx</small>
+                        </div>
+
+                        <!-- Search Text Section -->
+                        <div class="mb-4">
+                            <label for="wordSearchText" class="form-label fw-bold">Search Text (optional)</label>
+                            <InputText id="wordSearchText" @bind-Value="wordConversionRequest.SearchText" 
+                                class="form-control" placeholder="Enter text to search and highlight..." />
+                            <small class="form-text text-muted d-block mt-1">Leave empty if no highlighting is needed</small>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <button type="button" class="btn btn-secondary" @onclick="HandleWordClear">
+                                <i class="bi bi-arrow-counterclockwise"></i> Clear
+                            </button>
+
+                            @if (wordConvertedPdf != null && wordConvertedPdf.Length > 0)
+                            {
+                                <button type="button" class="btn btn-info text-white" @onclick="ShowWordPdfViewer">
+                                    <i class="bi bi-eye"></i> View PDF
+                                </button>
+                                <button type="button" class="btn btn-success" @onclick="DownloadWordPdfAsync">
+                                    <i class="bi bi-download"></i> Download PDF
+                                </button>
+                            }
+                            else
+                            {
+                                <button type="submit" class="btn btn-primary" disabled="@isWordProcessing">
+                                    @if (isWordProcessing)
+                                    {
+                                        <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                        <span>Processing...</span>
+                                    }
+                                    else
+                                    {
+                                        <span><i class="bi bi-file-earmark-pdf"></i> Convert to PDF</span>
+                                    }
+                                </button>
+                            }
+                        </div>
+
+                        <!-- Status Messages -->
+                        @if (!string.IsNullOrEmpty(wordStatusMessage))
+                        {
+                            <div class="alert alert-info alert-dismissible fade show mt-4" role="alert">
+                                <i class="bi bi-info-circle"></i>
+                                @wordStatusMessage
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>
+                        }
+
+                        @if (!string.IsNullOrEmpty(wordErrorMessage))
+                        {
+                            <div class="alert alert-danger alert-dismissible fade show mt-4" role="alert">
+                                <i class="bi bi-exclamation-circle"></i>
+                                @wordErrorMessage
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>
+                        }
+                    </EditForm>
+
+                    <!-- Word PDF Viewer -->
+                    @if (showWordViewer && wordConvertedPdf != null && wordConvertedPdf.Length > 0)
+                    {
+                        <div class="mt-4">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <h5 class="mb-0"><i class="bi bi-file-pdf"></i> PDF Preview</h5>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="CloseWordViewer">
+                                    <i class="bi bi-x-lg"></i> Close Viewer
+                                </button>
+                            </div>
+                            <SfPdfViewer2 @ref="wordPdfViewer" Height="700px" Width="100%" >
+                                <PdfViewerEvents Created="OnWordViewerCreated"/>    
+                            </SfPdfViewer2>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private EditContext? editContext;
+    private ConversionRequest conversionRequest = new();
+    private string? fileName;
+    private string? statusMessage;
+    private string? errorMessage;
+    private bool isProcessing;
+
+    // HTML converted PDF state
+    private byte[]? htmlConvertedPdf;
+    private bool showHtmlViewer;
+    private SfPdfViewer2? htmlPdfViewer;
+
+    // Word to PDF variables
+    private EditContext? wordEditContext;
+    private WordConversionRequest wordConversionRequest = new();
+    private string? wordFileName;
+    private string? wordStatusMessage;
+    private string? wordErrorMessage;
+    private bool isWordProcessing;
+
+    // Word converted PDF state
+    private byte[]? wordConvertedPdf;
+    private bool showWordViewer;
+    private SfPdfViewer2? wordPdfViewer;
+
+    protected override void OnInitialized()
+    {
+        editContext = new EditContext(conversionRequest);
+        wordEditContext = new EditContext(wordConversionRequest);
+    }
+
+    /// <summary>
+    /// Switch between tabs
+    /// </summary>
+    private async Task SwitchTab(string tabId)
+    {
+        await JS.InvokeVoidAsync("switchTab", tabId);
+    }
+
+    private async Task HandleFileUploadAsync(InputFileChangeEventArgs e)
+    {
+        try
+        {
+            errorMessage = null;
+            var file = e.File;
+
+            if (file == null)
+            {
+                errorMessage = "No file selected.";
+                return;
+            }
+
+            if (!file.Name.EndsWith(".html", StringComparison.OrdinalIgnoreCase) && 
+                !file.Name.EndsWith(".htm", StringComparison.OrdinalIgnoreCase))
+            {
+                errorMessage = "Please upload a valid HTML file (.html or .htm).";
+                return;
+            }
+
+            // Limit file size to 10 MB
+            const long maxFileSize = 10 * 1024 * 1024;
+            if (file.Size > maxFileSize)
+            {
+                errorMessage = "File size exceeds 10 MB limit.";
+                return;
+            }
+
+            // Read file content
+            using var stream = file.OpenReadStream(maxFileSize);
+            using var memoryStream = new MemoryStream();
+            await stream.CopyToAsync(memoryStream);
+
+            conversionRequest.HtmlFileContent = memoryStream.ToArray();
+            fileName = file.Name;
+            statusMessage = $"File '{fileName}' uploaded successfully.";
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error uploading file: {ex.Message}";
+        }
+    }
+
+    private async Task HandleConversionAsync()
+    {
+        try
+        {
+            isProcessing = true;
+            statusMessage = null;
+            errorMessage = null;
+
+            if (conversionRequest.HtmlFileContent == null || conversionRequest.HtmlFileContent.Length == 0)
+            {
+                errorMessage = "Please upload an HTML file first.";
+                isProcessing = false;
+                return;
+            }
+
+            // Call server method to process the conversion
+            var result = await ProcessHtmlToPdfAsync(conversionRequest);
+
+            if (result.Success && result.PdfBytes != null && result.PdfBytes.Length > 0)
+            {
+                htmlConvertedPdf = result.PdfBytes;
+                statusMessage = result.Message;
+            }
+            else
+            {
+                htmlConvertedPdf = null;
+                errorMessage = result.Message ?? "Conversion failed without an error message.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Error during conversion: {ex.Message}";
+        }
+        finally
+        {
+            isProcessing = false;
+        }
+    }
+
+    /// <summary>
+    /// Clear all form data and reset to initial state
+    /// </summary>
+    private void HandleClear()
+    {
+        // Clear all form fields
+        conversionRequest = new ConversionRequest();
+        fileName = null;
+        statusMessage = null;
+        errorMessage = null;
+        isProcessing = false;
+
+        // Reset converted PDF and viewer state
+        htmlConvertedPdf = null;
+        showHtmlViewer = false;
+        htmlPdfViewer = null;
+
+        // Recreate edit context
+        editContext = new EditContext(conversionRequest);
+    }
+
+    /// <summary>
+    /// Download PDF file to client
+    /// </summary>
+    private async Task DownloadPdfAsync(byte[] pdfBytes)
+    {
+        // Generate filename with timestamp
+        string fileName = $"converted_{DateTime.Now:yyyyMMdd_HHmmss}.pdf";
+
+        await JS.SaveAs(fileName, pdfBytes);       
+    }
+
+    /// <summary>
+    /// Show the SfPdfViewer component.
+    /// </summary>
+    private void ShowHtmlPdfViewer()
+    {
+        if (htmlConvertedPdf == null || htmlConvertedPdf.Length == 0)
+        {
+            errorMessage = "No converted PDF available to view.";
+            return;
+        }
+
+        showHtmlViewer = true;
+    }
+
+    /// <summary>
+    /// Load the converted HTML PDF.
+    /// </summary>
+    private async Task OnHtmlViewerCreated()
+    {
+        if (htmlPdfViewer != null && showHtmlViewer)
+        {
+            await htmlPdfViewer.LoadAsync(htmlConvertedPdf);
+        }
+    }
+
+    /// <summary>
+    /// Close the HTML PDF viewer.
+    /// </summary>
+    private void CloseHtmlViewer()
+    {
+        showHtmlViewer = false;
+    }
+
+    /// <summary>
+    /// Download the HTML-converted PDF.
+    /// </summary>
+    private async Task DownloadHtmlPdfAsync()
+    {
+        if (htmlConvertedPdf != null && htmlConvertedPdf.Length > 0)
+        {
+            await DownloadPdfAsync(htmlConvertedPdf);
+        }
+    }
+
+    /// <summary>
+    /// Server-side method to handle HTML to PDF conversion
+    /// This method receives the uploaded HTML file, search text, and compression options
+    /// </summary>
+    /// <param name="conversionRequest">The conversion request containing HTML content and options</param>
+    /// <returns>Result of the conversion operation</returns>
+    private async Task<ConversionResult> ProcessHtmlToPdfAsync(ConversionRequest conversionRequest)
+    {
+        return await Task.Run(() =>
+        {
+            try
+            {
+
+                var htmlContent = System.Text.Encoding.UTF8.GetString(conversionRequest.HtmlFileContent);
+
+                // Highlight search text
+                if (!string.IsNullOrWhiteSpace(conversionRequest.SearchText))
+                {
+                    htmlContent = Regex.Replace(
+                        htmlContent,
+                        Regex.Escape(conversionRequest.SearchText),
+                        match =>
+                            $"<span style='background-color:yellow;font-weight:bold;'>{match.Value}</span>",
+                        RegexOptions.IgnoreCase);
+                }
+
+                // Initialize HTML to PDF converter
+                HtmlToPdfConverter htmlConverter =
+                    new HtmlToPdfConverter(HtmlRenderingEngine.Blink);
+
+                BlinkConverterSettings blinkSettings =
+                    new BlinkConverterSettings();
+
+                blinkSettings.ViewPortSize =
+                    new Syncfusion.Drawing.Size(1280, 0);
+
+                htmlConverter.ConverterSettings = blinkSettings;
+
+                // Convert HTML string to PDF
+                PdfDocument document =
+                    htmlConverter.Convert(htmlContent, string.Empty);
+
+                MemoryStream stream = new MemoryStream();
+
+                document.Save(stream);
+
+                document.Close(true);
+
+                stream.Position = 0;
+
+
+                MemoryStream compressedPdfStream = CompressPdf(stream, conversionRequest);
+
+                return new ConversionResult
+                    {
+                        Success = true,
+                        Message = "HTML converted to PDF successfully!",
+                        PdfBytes = compressedPdfStream.ToArray()
+                    };
+            }
+            catch (Exception ex)
+            {
+                return new ConversionResult
+                    {
+                        Success = false,
+                        Message = $"Server error: {ex.Message}"
+                    };
+            }
+        });
+    }
+    private MemoryStream CompressPdf(Stream stream, ConversionRequest conversionRequest)
+    {
+        PdfLoadedDocument ldoc = new PdfLoadedDocument(stream);
+
+        PdfCompressionOptions options = new PdfCompressionOptions();
+
+        if (conversionRequest.CompressImage)
+        {
+            options.CompressImages = true;
+            options.ImageQuality = conversionRequest.ImageQuality;
+        }
+        else
+        {
+            options.CompressImages = false;
+        }
+        options.OptimizePageContents = conversionRequest.OptimizePageContents;
+        options.OptimizeFont = conversionRequest.OptimizeFont;
+        options.RemoveMetadata = conversionRequest.RemoveMetadata;
+
+        ldoc.Compress(options);
+        MemoryStream ms = new MemoryStream();
+        ldoc.Save(ms);
+        ldoc.Close(true);
+        ms.Position = 0;
+        return ms;
+    }
+
+    
+    // ==================== WORD TO PDF METHODS ====================
+
+    /// <summary>
+    /// Handle Word file upload
+    /// </summary>
+    private async Task HandleWordFileUploadAsync(InputFileChangeEventArgs e)
+    {
+        try
+        {
+            wordErrorMessage = null;
+            var file = e.File;
+
+            if (file == null)
+            {
+                wordErrorMessage = "No file selected.";
+                return;
+            }
+
+            if (!file.Name.EndsWith(".doc", StringComparison.OrdinalIgnoreCase) && 
+                !file.Name.EndsWith(".docx", StringComparison.OrdinalIgnoreCase))
+            {
+                wordErrorMessage = "Please upload a valid Word file (.doc or .docx).";
+                return;
+            }
+
+            // Limit file size to 25 MB
+            const long maxFileSize = 25 * 1024 * 1024;
+            if (file.Size > maxFileSize)
+            {
+                wordErrorMessage = "File size exceeds 25 MB limit.";
+                return;
+            }
+
+            // Read file content
+            using var stream = file.OpenReadStream(maxFileSize);
+            using var memoryStream = new MemoryStream();
+            await stream.CopyToAsync(memoryStream);
+
+            wordConversionRequest.WordFileContent = memoryStream.ToArray();
+            wordFileName = file.Name;
+            wordStatusMessage = $"File '{wordFileName}' uploaded successfully.";
+        }
+        catch (Exception ex)
+        {
+            wordErrorMessage = $"Error uploading file: {ex.Message}";
+        }
+    }
+
+    /// <summary>
+    /// Handle Word to PDF conversion
+    /// </summary>
+    private async Task HandleWordConversionAsync()
+    {
+        try
+        {
+            isWordProcessing = true;
+            wordStatusMessage = null;
+            wordErrorMessage = null;
+
+            if (wordConversionRequest.WordFileContent == null || wordConversionRequest.WordFileContent.Length == 0)
+            {
+                wordErrorMessage = "Please upload a Word file first.";
+                isWordProcessing = false;
+                return;
+            }
+
+            // Call server method to process the conversion
+            var result = await ProcessWordToPdfAsync(wordConversionRequest);
+
+            if (result.Success && result.PdfBytes != null && result.PdfBytes.Length > 0)
+            {
+                wordConvertedPdf = result.PdfBytes;
+                wordStatusMessage = result.Message;
+            }
+            else
+            {
+                wordConvertedPdf = null;
+                wordErrorMessage = result.Message ?? "Conversion failed without an error message.";
+            }
+        }
+        catch (Exception ex)
+        {
+            wordErrorMessage = $"Error during conversion: {ex.Message}";
+        }
+        finally
+        {
+            isWordProcessing = false;
+        }
+    }
+
+    /// <summary>
+    /// Clear all Word form data and reset to initial state
+    /// </summary>
+    private void HandleWordClear()
+    {
+        // Clear all form fields
+        wordConversionRequest = new WordConversionRequest();
+        wordFileName = null;
+        wordStatusMessage = null;
+        wordErrorMessage = null;
+        isWordProcessing = false;
+
+        // Reset converted PDF and viewer state
+        wordConvertedPdf = null;
+        showWordViewer = false;
+        wordPdfViewer = null;
+
+        // Recreate edit context
+        wordEditContext = new EditContext(wordConversionRequest);
+    }
+
+    /// <summary>
+    /// Server-side method to handle Word to PDF conversion
+    /// This method receives the uploaded Word file and search text
+    /// </summary>
+    /// <param name="conversionRequest">The conversion request containing Word file content and options</param>
+    /// <returns>Result of the conversion operation</returns>
+    private async Task<ConversionResult> ProcessWordToPdfAsync(WordConversionRequest conversionRequest)
+    {
+        return await Task.Run(() =>
+        {
+            try
+            {
+                // Step 1: Load Word document from bytes
+                using var wordDoc = LoadWordDocument(conversionRequest.WordFileContent);
+
+                // Step 2: Handle search text highlighting (if provided)
+                if (!string.IsNullOrEmpty(conversionRequest.SearchText))
+                {
+                    var selections = wordDoc.FindAll(conversionRequest.SearchText, false, false);
+                    if (selections != null)
+                    {
+                        foreach (TextSelection selection in selections)
+                        {
+                            var range = selection.GetAsOneRange();
+                            range.CharacterFormat.HighlightColor = Syncfusion.Drawing.Color.Yellow;
+                            range.CharacterFormat.Bold = true;
+                        }
+                    }
+                }
+
+                // Step 3: Convert Word to PDF
+                using var renderer = new DocIORenderer();
+                using var pdfDocument = renderer.ConvertToPDF(wordDoc);
+                using MemoryStream ms = new MemoryStream();
+                pdfDocument.Save(ms);
+                ms.Position = 0;
+
+                // Step 4: Compress the resulting PDF
+                MemoryStream compressedPdfStream = CompressPdf(ms, conversionRequest);
+
+                return new ConversionResult
+                {
+                    Success = true,
+                    Message = "Word converted to PDF successfully!",
+                    PdfBytes = compressedPdfStream.ToArray()
+                };
+            }
+            catch (Exception ex)
+            {
+                return new ConversionResult
+                {
+                    Success = false,
+                    Message = $"Server error: {ex.Message}"
+                };
+            }
+        });
+    }
+
+        /// <summary>
+        /// Loads a Word document from a byte array using Syncfusion DocIO.
+        /// Supports both .doc and .docx formats — the format is auto-detected
+        /// from the input bytes.
+        /// </summary>
+        /// <param name="fileBytes">Raw bytes of the uploaded Word file.</param>
+        /// <returns>An opened <see cref="WordDocument"/> instance ready for processing.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="fileBytes"/> is null or empty.</exception>
+        /// <exception cref="InvalidOperationException">Thrown when the bytes cannot be parsed as a Word document.</exception>
+        private WordDocument LoadWordDocument(byte[]? fileBytes)
+        {
+            if (fileBytes == null || fileBytes.Length == 0)
+            {
+                throw new ArgumentNullException(nameof(fileBytes), "Word file content is empty.");
+            }
+
+            try
+            {
+                using var inputStream = new MemoryStream(fileBytes);
+
+                // FormatType.Auto lets DocIO detect whether the stream is .doc or .docx.
+                WordDocument document = new WordDocument(inputStream, FormatType.Automatic);
+
+                return document;
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException(
+                    "Unable to load the Word document. The file may be corrupt or in an unsupported format.",
+                    ex);
+            }
+        }
+
+    /// <summary>
+    /// Show the SfPdfViewer Component.
+    /// </summary>
+    private void ShowWordPdfViewer()
+    {
+        if (wordConvertedPdf == null || wordConvertedPdf.Length == 0)
+        {
+            wordErrorMessage = "No converted PDF available to view.";
+            return;
+        }
+        showWordViewer = true;
+    }
+
+    /// <summary>
+    /// Load the converted Word PDF.
+    /// </summary>
+    private async Task OnWordViewerCreated()
+    {
+        if (wordPdfViewer != null && showWordViewer)
+        {
+            await wordPdfViewer.LoadAsync(wordConvertedPdf);
+        }
+    }
+
+    /// <summary>
+    /// Close the Word PDF viewer.
+    /// </summary>
+    private void CloseWordViewer()
+    {
+        showWordViewer = false;
+    }
+
+    /// <summary>
+    /// Download the Word-converted PDF.
+    /// </summary>
+    private async Task DownloadWordPdfAsync()
+    {
+        if (wordConvertedPdf != null && wordConvertedPdf.Length > 0)
+        {
+            await DownloadPdfAsync(wordConvertedPdf);
+        }
+    }
+        /// <summary>
+        /// Compresses a PDF stream produced from the Word-to-PDF conversion.
+        /// WordConversionRequest does not expose compression options today, so
+        /// default compression settings are applied. If you need user-tunable
+        /// compression for the Word path, add the same option properties used by
+        /// <see cref="ConversionRequest"/> onto <see cref="WordConversionRequest"/>.
+        /// </summary>
+        private MemoryStream CompressPdf(Stream stream, WordConversionRequest conversionRequest)
+        {
+            PdfLoadedDocument ldoc = new PdfLoadedDocument(stream);
+
+            PdfCompressionOptions options = new PdfCompressionOptions
+            {
+                // Sensible defaults for Word-derived PDFs; adjust to taste.
+                CompressImages = true,
+                ImageQuality = 75,
+                OptimizePageContents = true,
+                OptimizeFont = true,
+                RemoveMetadata = false
+            };
+
+            ldoc.Compress(options);
+            MemoryStream ms = new MemoryStream();
+            ldoc.Save(ms);
+            ldoc.Close(true);
+            ms.Position = 0;
+            return ms;
+        }
+
+
+    /// <summary>
+    /// Model for the conversion request
+    /// </summary>
+    public class ConversionRequest
+    {
+        public byte[]? HtmlFileContent { get; set; }
+        public string? SearchText { get; set; }
+        public bool CompressImage { get; set; }
+        public int ImageQuality { get; set; } = 50;
+        public bool OptimizePageContents { get; set; }
+        public bool OptimizeFont { get; set; }
+        public bool RemoveMetadata { get; set; }
+    }
+
+    /// <summary>
+    /// Model for Word to PDF conversion request
+    /// </summary>
+    public class WordConversionRequest
+    {
+        public byte[]? WordFileContent { get; set; }
+        public string? SearchText { get; set; }
+    }
+
+    /// <summary>
+    /// Model for the conversion result
+    /// </summary>
+    public class ConversionResult
+    {
+        public bool Success { get; set; }
+        public string? Message { get; set; }
+        public byte[]? PdfBytes { get; set; }
+    }
+}
