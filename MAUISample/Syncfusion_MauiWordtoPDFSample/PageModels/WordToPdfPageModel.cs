@@ -135,13 +135,12 @@ namespace Syncfusion_MauiWordtoPDFSample.PageModels
             {
                 var fileName = $"Document_{DateTime.Now:yyyyMMdd_HHmmss}.pdf";
 
-                // Use the app's own data directory which is guaranteed to be writable
-                // on every platform (Windows, Android, iOS, MacCatalyst). Saving into
-                // the user's Documents folder from a MAUI desktop app can fail because
-                // the folder may be redirected or the process may lack permissions.
-                var saveDirectory = FileSystem.Current.AppDataDirectory;
-                Directory.CreateDirectory(saveDirectory);
-                var savePath = Path.Combine(saveDirectory, fileName);
+                // Save into the user's Downloads folder. On Windows this maps to
+                // the "Downloads" folder under the user's profile. On Android it
+                // is the public Downloads directory. On iOS / MacCatalyst we fall
+                // back to the app's own cache directory because the sandbox does
+                // not expose a writable Downloads folder directly.
+                string savePath = GetDownloadsFilePath(fileName);
 
                 _pdfStream.Position = 0;
                 using (var fileStream = File.Create(savePath))
@@ -151,15 +150,21 @@ namespace Syncfusion_MauiWordtoPDFSample.PageModels
 
                 StatusMessage = $"PDF saved to: {savePath}";
 
-                // Try to open the saved file with the system's default PDF viewer.
-                // This is optional - if launching fails we still keep the saved file.
+                // Open the file with the system's default PDF viewer (Acrobat
+                // Reader, Foxit, Preview, etc.) instead of forcing the user's
+                // default browser. On Windows we use the WinUI Launcher which
+                // invokes the registered "open with" app for the .pdf extension.
                 try
                 {
+#if WINDOWS
+                    OpenPdfWithDefaultAppWindows(savePath);
+#else
                     await Launcher.Default.OpenAsync(new OpenFileRequest
                     {
                         Title = fileName,
                         File = new ReadOnlyFile(savePath)
                     });
+#endif
                 }
                 catch
                 {
@@ -172,6 +177,61 @@ namespace Syncfusion_MauiWordtoPDFSample.PageModels
                 await Application.Current!.MainPage!.DisplayAlert("Error", $"Failed to save PDF:\n{ex.Message}", "OK");
             }
         }
+
+        private static string GetDownloadsFilePath(string fileName)
+        {
+#if WINDOWS
+            // Windows: use the user's "Downloads" folder. KnownFolderId 0x374D
+            // corresponds to FOLDERID_Downloads. The Environment.SpecialFolder
+            // enum is a safe cross-version way to get the same path.
+            var downloads = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            downloads = Path.Combine(downloads, "Downloads");
+            if (!Directory.Exists(downloads))
+            {
+                // Fallback if the special folder cannot be resolved.
+                downloads = FileSystem.Current.AppDataDirectory;
+            }
+            Directory.CreateDirectory(downloads);
+            return Path.Combine(downloads, fileName);
+#elif ANDROID
+            var downloads = Android.OS.Environment.GetExternalStoragePublicDirectory(
+                Android.OS.Environment.DirectoryDownloads)?.AbsolutePath;
+            if (string.IsNullOrEmpty(downloads))
+            {
+                downloads = FileSystem.Current.AppDataDirectory;
+            }
+            Directory.CreateDirectory(downloads);
+            return Path.Combine(downloads, fileName);
+#elif MACCATALYST || IOS
+            // Sandboxed iOS / MacCatalyst apps cannot write to a public Downloads
+            // folder without a file picker, so use the app's own Documents folder
+            // which the user can still access via the Files app.
+            var docs = FileSystem.Current.AppDataDirectory;
+            Directory.CreateDirectory(docs);
+            return Path.Combine(docs, fileName);
+#else
+            var fallback = FileSystem.Current.AppDataDirectory;
+            Directory.CreateDirectory(fallback);
+            return Path.Combine(fallback, fileName);
+#endif
+        }
+
+#if WINDOWS
+        private static void OpenPdfWithDefaultAppWindows(string filePath)
+        {
+            // UseShellExecute = true makes the OS resolve the registered handler
+            // for .pdf (Adobe Reader, Foxit, SumatraPDF, ...) instead of
+            // forcing the default browser / Microsoft Edge. The verb "open"
+            // explicitly requests the default registered application.
+            var psi = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = filePath,
+                UseShellExecute = true,
+                Verb = "open"
+            };
+            System.Diagnostics.Process.Start(psi);
+        }
+#endif
 
         private bool CanConvert() => !IsBusy && !string.IsNullOrWhiteSpace(SelectedFilePath);
 
