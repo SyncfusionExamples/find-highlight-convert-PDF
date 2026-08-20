@@ -11,4 +11,9 @@
         ContentTemplate="{DataTemplate pages:WordToPdfPage}"
         Route="wordtopdf" />
 
+    <ShellContent
+        Title="PDF Viewer"
+        ContentTemplate="{DataTemplate pages:PdfViewerPage}"
+        Route="pdfviewer" />
+
 </Shell>

@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.Logging;
+using Syncfusion.Maui.Core.Hosting;
 
 namespace Syncfusion_MauiWordtoPDFSample
 {
@@ -15,12 +16,15 @@ namespace Syncfusion_MauiWordtoPDFSample
                     fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
                 });
 
+            builder.ConfigureSyncfusionCore();
 #if DEBUG
             builder.Logging.AddDebug();
 #endif
 
             builder.Services.AddTransient<Pages.WordToPdfPage>();
             builder.Services.AddTransient<PageModels.WordToPdfPageModel>();
+            builder.Services.AddTransient<Pages.PdfViewerPage>();
+            builder.Services.AddTransient<PageModels.PdfViewerPageModel>();
 
             return builder.Build();
         }

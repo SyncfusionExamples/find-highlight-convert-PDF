@@ -73,6 +73,31 @@
                     HeightRequest="36"
                     Padding="12,4" />
 
+            <HorizontalStackLayout Spacing="12"
+                                    IsVisible="{Binding IsConverted}"
+                                    HorizontalOptions="Center">
+                <Button Text="View PDF"
+                        Command="{Binding ViewPdfCommand}"
+                        FontSize="{StaticResource PageFontButton}"
+                        FontAttributes="Bold"
+                        HeightRequest="36"
+                        Padding="12,4" />
+
+                <Button Text="Save PDF"
+                        Command="{Binding SavePdfCommand}"
+                        FontSize="{StaticResource PageFontButton}"
+                        FontAttributes="Bold"
+                        HeightRequest="36"
+                        Padding="12,4" />
+
+                <Button Text="Clear"
+                        Command="{Binding ClearCommand}"
+                        FontSize="{StaticResource PageFontButton}"
+                        FontAttributes="Bold"
+                        HeightRequest="36"
+                        Padding="12,4" />
+            </HorizontalStackLayout>
+
             <ActivityIndicator IsRunning="{Binding IsBusy}"
                                IsVisible="{Binding IsBusy}"
                                HeightRequest="20"
