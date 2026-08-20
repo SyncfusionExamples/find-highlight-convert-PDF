@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:pageModels="clr-namespace:Syncfusion_MauiWordtoPDFSample.PageModels"
+             x:Class="Syncfusion_MauiWordtoPDFSample.Pages.WordToPdfPage"
+             x:DataType="pageModels:WordToPdfPageModel"
+             Title="Word to PDF"
+             Padding="16">
+
+    <ContentPage.Resources>
+        <x:Double x:Key="PageFontBody">13</x:Double>
+        <x:Double x:Key="PageFontCaption">11</x:Double>
+        <x:Double x:Key="PageFontTitle">18</x:Double>
+        <x:Double x:Key="PageFontButton">13</x:Double>
+    </ContentPage.Resources>
+
+    <ScrollView>
+        <VerticalStackLayout Spacing="12" MaximumWidthRequest="520" HorizontalOptions="Center">
+
+            <Label Text="Word to PDF Converter"
+                   FontSize="{StaticResource PageFontTitle}"
+                   FontAttributes="Bold"
+                   HorizontalOptions="Center" />
+
+            <Label Text="Select a Word or RTF document, choose the text to highlight and a compression level, then convert."
+                   FontSize="{StaticResource PageFontCaption}"
+                   HorizontalOptions="Center"
+                   HorizontalTextAlignment="Center" />
+
+            <Border StrokeShape="RoundRectangle 10"
+                    Padding="10"
+                    BackgroundColor="{AppThemeBinding Light={StaticResource LightSecondaryBackground}, Dark={StaticResource DarkSecondaryBackground}}">
+                <VerticalStackLayout Spacing="6">
+                    <Label Text="Selected file"
+                           FontSize="{StaticResource PageFontBody}"
+                           FontAttributes="Bold" />
+                    <Label Text="{Binding SelectedFileName, FallbackValue='No file selected'}"
+                           FontSize="{StaticResource PageFontBody}"
+                           LineBreakMode="MiddleTruncation" />
+                    <Button Text="Browse..."
+                            Command="{Binding BrowseCommand}"
+                            FontSize="{StaticResource PageFontButton}"
+                            Padding="10,4"
+                            MinimumHeightRequest="32"
+                            HorizontalOptions="Start" />
+                </VerticalStackLayout>
+            </Border>
+
+            <VerticalStackLayout Spacing="4">
+                <Label Text="Text to find (optional)"
+                       FontSize="{StaticResource PageFontBody}"
+                       FontAttributes="Bold" />
+                <Entry Text="{Binding TextToFind}"
+                       FontSize="{StaticResource PageFontBody}"
+                       Placeholder="Enter text to highlight in the document"
+                       ClearButtonVisibility="WhileEditing" />
+            </VerticalStackLayout>
+
+            <VerticalStackLayout Spacing="4">
+                <Label Text="Compression option"
+                       FontSize="{StaticResource PageFontBody}"
+                       FontAttributes="Bold" />
+                <Picker Title="Select compression level"
+                        FontSize="{StaticResource PageFontBody}"
+                        ItemsSource="{Binding CompressionOptions}"
+                        SelectedItem="{Binding CompressionLevel}" />
+            </VerticalStackLayout>
+
+            <Button Text="Convert to PDF"
+                    Command="{Binding ConvertCommand}"
+                    FontSize="{StaticResource PageFontButton}"
+                    FontAttributes="Bold"
+                    HeightRequest="36"
+                    Padding="12,4" />
+
+            <HorizontalStackLayout Spacing="12"
+                                    IsVisible="{Binding IsConverted}"
+                                    HorizontalOptions="Center">
+                <Button Text="View PDF"
+                        Command="{Binding ViewPdfCommand}"
+                        FontSize="{StaticResource PageFontButton}"
+                        FontAttributes="Bold"
+                        HeightRequest="36"
+                        Padding="12,4" />
+
+                <Button Text="Save PDF"
+                        Command="{Binding SavePdfCommand}"
+                        FontSize="{StaticResource PageFontButton}"
+                        FontAttributes="Bold"
+                        HeightRequest="36"
+                        Padding="12,4" />
+
+                <Button Text="Clear"
+                        Command="{Binding ClearCommand}"
+                        FontSize="{StaticResource PageFontButton}"
+                        FontAttributes="Bold"
+                        HeightRequest="36"
+                        Padding="12,4" />
+            </HorizontalStackLayout>
+
+            <ActivityIndicator IsRunning="{Binding IsBusy}"
+                               IsVisible="{Binding IsBusy}"
+                               HeightRequest="20"
+                               HorizontalOptions="Center" />
+
+            <Label Text="{Binding StatusMessage}"
+                   FontSize="{StaticResource PageFontCaption}"
+                   HorizontalOptions="Center"
+                   HorizontalTextAlignment="Center" />
+
+        </VerticalStackLayout>
+    </ScrollView>
+</ContentPage>
